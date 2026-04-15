@@ -1,0 +1,48 @@
+flowchart TD
+    subgraph GHA["GitHub Archive"]
+        URL["https://data.gharchive.org/
+        2024-01-15-14.json.gz
+        En fil per timme
+        Från 2011 till igår"]
+    end
+
+    subgraph BOOT["scripts/bootstrap_historical.py"]
+        direction TB
+        RANGE["Definiera tidsintervall
+        start_date -> end_date
+        Generera lista av URL:er per timme"]
+        
+        FETCH["requests.get(url)
+        Ladda ner .json.gz
+        Direkt till minnet
+        Ingen temporär fil på disk"]
+        
+        DECOMP["gzip.decompress()
+        Packa upp i minnet
+        Parsa rad för rad
+        (en JSON-rad per event)"]
+        
+        FILT["Filtrera på DE_KEYWORDS
+        och RELEVANT_EVENT_TYPES
+        Samma logik som producer.py
+        Men mot historisk data"]
+        
+        WRITE["Skriv filtrerade events
+        till Bronze som Parquet
+        Samma Hive-style partitionering
+        year=/month=/day=/"]
+    end
+
+    subgraph BRONZE["Bronze"]
+        BP["Historiska events
+        blandade med
+        live-events från Kafka
+        Samma format, samma struktur"]
+    end
+
+    URL -->|"HTTPS GET"| FETCH
+    FETCH --> DECOMP
+    DECOMP --> FILT
+    FILT --> WRITE
+    RANGE -->|"Styr vilka URL:er"| FETCH
+    WRITE --> BRONZE

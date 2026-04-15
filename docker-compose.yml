@@ -1,0 +1,67 @@
+# docker-compose.yml
+services:
+
+  # ======== Kafka (KRaft mode - no Zookeeper) ======== 
+  kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    container_name: kafka
+    ports:
+      - "29092:29092"       # Host machine reaches Kafka here
+    environment:
+      # KRaft requires a unique node ID and a cluster ID
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      # Two listeners: internal (containers) and external (my host machine)
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # Topic settings
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 24           # Raw data in Kafka for 24h, then it lives in Bronze
+
+      # KRaft cluster ID - generated once, hardcoded here
+      CLUSTER_ID: "Mk3OEYBSD4fcwNTJRAYmVA"
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # ======== Producer ========
+  producer:
+    build: .
+    container_name: producer
+    command: uv run python -m ingestion.producer
+    env_file: .env
+    environment:
+      KAFKA_BROKER: kafka:9092       # Internal address - not localhost
+      PYTHONUNBUFFERED: "1"    # Forces Python to write logs directly
+    depends_on:
+      kafka:
+        condition: service_healthy   # Wait until Kafka is ready
+
+
+  # ======== Consumer ========
+  consumer:
+    build: .
+    container_name: consumer
+    command: uv run python -m ingestion.consumer
+    env_file: .env
+    environment:
+      KAFKA_BROKER: kafka:9092
+      PYTHONUNBUFFERED: "1"    # Forces Python to write logs directly
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data             # Bind mount - Parquet files end up on host machine
+
+networks:
+  default:
+    name: data-lake-network

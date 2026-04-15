@@ -1,0 +1,44 @@
+flowchart LR
+    subgraph LIVE["Live Path (Kafka)"]
+        direction TB
+        API["api.github.com/events
+        Max 300 senaste publika events
+        5000 req/h med token"]
+
+        PROD["producer.py
+        pollar var 5:e min
+        filtrerar på DE_KEYWORDS
+        skickar som JSON"]
+        KAFKA[["Kafka Topic
+        github-events-raw
+        Retention: 24h"]]
+        CONS["consumer.py
+        batcher events
+        convert JSON → Parquet
+        skriv till Bronze"]
+    end
+
+    subgraph HIST["Historical Path (Bootstrap)"]
+        direction TB
+        GHA["gharchive.org
+        *.json.gz per timme
+        fr.o.m. 2011"]
+        BOOT["bootstrap_historical.py
+        Laddar ner .json.gz
+        Packar upp
+        Filtrerar + skriver Parquet"]
+    end
+
+    subgraph BRONZE["Bronze"]
+        direction TB
+        PART["Hive-style partitionering 
+        data/bronze/events/year=2025/month=03/day=16/event_type=PushEvent/
+        part-0001.parquet"]
+    end
+
+    API -->|"GET /events Etag header för dedup"| PROD
+    PROD -->|"produce(topic, json)"| KAFKA
+    KAFKA -->|"consume()"| CONS
+    CONS -->|"pyarrow.write_to_dataset()"| BRONZE
+    GHA -->|"requests.get(url)"| BOOT
+    BOOT -->|"gzip.open() → filter"| BRONZE

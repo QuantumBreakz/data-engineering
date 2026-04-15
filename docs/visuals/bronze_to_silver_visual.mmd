@@ -1,0 +1,60 @@
+flowchart TD
+    subgraph BRONZE["Bronze - SSOT"]
+        BP["Parquet-filer
+        Orörd rådata
+        Allt sparas, inget filtreras
+        Sanningens källa"]
+    end
+
+    subgraph B2S["bronze_to_silver.py -
+     Sorteringsstationen"]
+        direction TB
+        READ["pandas.read_parquet()
+        Läser hela Bronze-partitionen"]
+        
+        VAL["Valideringssteg
+        Finnns id, type, repo, actor, created_at?
+        Är created_at ett giltigt datum?
+        Är event_type ett vi känner igen?"]
+        
+        SPLIT{"Klarar valideringen?"}
+        
+        DEDUP["Deduplicering
+        Drop på event_id
+        Samma event kan finnas
+        i flera poll-cykler"]
+        
+        FLAT["Flattenning
+        actor.login -> actor_login
+        repo.name -> repo_name
+        payload.size -> commit_count
+        Nästad JSON -> platta kolumner"]
+    end
+
+    subgraph SILVER["Silver - Data Jag litar på"]
+        SP["Parquet-filer
+        Validerade, deduplicerade,
+        flattade kolumner
+        Redo för analys"]
+    end
+
+    subgraph DLQ["💀💀Dead Letter Queue💀💀"]
+        DP["data/dlq/events/
+        year=/month=/day=/
+        Parquet-filer
+        Ogiltiga events sparas HÄR
+        Bronze rörs aldrig"]
+    end
+
+    BP ..-> READ
+    READ --> VAL
+    VAL --> SPLIT
+    SPLIT -->|"Ja"| DEDUP
+    SPLIT -->|"Nej"| DP
+    DEDUP --> FLAT
+    FLAT --> SP
+
+    NOTE["⚠️⚠️Bronze rörs aldrig.⚠️⚠️
+    Om valideringslogiken har en bugg
+    kan jag alltid köra om
+    från Bronze med fixad kod."]

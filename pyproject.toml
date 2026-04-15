@@ -1,0 +1,27 @@
+[project]
+name = "data-lake-project"
+version = "0.1.0"
+description = "A medallion data lake pipeline consuming GitHub Events"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "confluent-kafka>=2.13.2",
+    "ipykernel>=7.2.0",
+    "loguru>=0.7.0",
+    "pandas>=2.2.0",
+    "pyarrow>=15.0.0",
+    "pydantic>=2.6.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.32.5",
+    "pyspark>=3.5.0",
+    "matplotlib>=3.10.8",
+    "seaborn>=0.13.2",
+]
+
+[dependency-groups]
+dev = [
+    "black>=24.0.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.3.0",
+]

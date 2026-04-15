@@ -1,0 +1,49 @@
+flowchart TD
+    subgraph SILVER["Silver Layer"]
+        SR["263 321 events
+        Validerade, deduplicerade
+        Flattade kolumner"]
+    end
+
+    subgraph S2G["silver_to_gold.py"]
+        direction TB
+        READ["spark.read.parquet(SILVER_DIR)
+        Läser hela Silver-lagret"]
+        
+        SPLIT["Dela upp i event-specifika DataFrames
+        df_watch  → WatchEvent
+        df_push   → PushEvent
+        df_pr     → PullRequestEvent"]
+        
+        AGG1["tool_growth
+        GROUP BY repo_name + vecka
+        COUNT WatchEvents (stars)
+        COUNT ForkEvents
+        Window: rullande 7 dagar"]
+        
+        AGG2["activity_heatmap
+        GROUP BY hour_of_day + day_of_week
+        COUNT alla events
+        Extrahera timme från created_at"]
+        
+        AGG3["pr_cycle_times
+        Self-join på repo_name
+        Matcha opened → closed
+        DATEDIFF i timmar
+        Median + p95 per repo"]
+    end
+
+    subgraph GOLD["Gold Layer"]
+        G1["gold/tool_growth/repo_name | week | stars | forks"]
+        G2["gold/activity_heatmap/hour | weekday | event_count"]
+        G3["gold/pr_cycle_times/repo | median_hours | p95_hours"]
+    end
+
+    SR --> READ
+    READ --> SPLIT
+    SPLIT --> AGG1
+    SPLIT --> AGG2
+    SPLIT --> AGG3
+    AGG1 --> G1
+    AGG2 --> G2
+    AGG3 --> G3

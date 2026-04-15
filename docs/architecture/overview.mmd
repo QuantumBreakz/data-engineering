@@ -1,0 +1,81 @@
+flowchart TD
+    subgraph SOURCES["Data Sources"]
+        GHA["GitHub Archive
+        (Historisk bootstrap)
+        gharchive.org/YYYY-MM-DD-HH.json.gz"]
+        GHE["GitHub Events API
+        (Live polling)
+        api.github.com/events"]
+    end
+
+    subgraph INGESTION["Ingestion Layer"]
+        BOOT["bootstrap_historical.py
+        Engångskörning
+        Laddar ner + packar upp GH Archive"]
+        PROD["producer.py
+        Pollar var 5:e minut
+        Skickar events → Kafka"]
+        KAFKA[["Apache Kafka
+        Topic: github-events-raw"]]
+        CONS["consumer.py
+        Konsumerar från Kafka
+        Skriver Parquet till disk"]
+    end
+
+    subgraph BRONZE["Bronze Layer 
+    (Rådata, orörd)"]
+        BP["data/bronze/events/
+        year=YYYY/month=MM/day=DD/
+        *.parquet"]
+    end
+
+    subgraph SILVER["Silver Layer
+    (Validerad + normaliserad)"]
+        BTS["bronze_to_silver.py
+        PySpark job
+        Pydantic-validering
+        Filtrerar irrelevanta event-typer"]
+        SP["data/silver/events/
+        *.parquet"]
+    end
+
+    subgraph GOLD["Gold Layer
+    (Aggregerad, analysklar)"]
+        STG["silver_to_gold.py
+        PySpark + dbt
+        Business logic"]
+        GP1["tool_growth/
+        Vilka DE-verktyg växer snabbast?"]
+        GP2["activity_heatmap/
+        När är communityt aktivt?"]
+        GP3["pr_cycle_times/Hur lång är en typisk PR-cykel?"]
+    end
+
+    subgraph SERVING["Serving Layer"]
+        GRAF["Grafana
+        Dashboards"]
+    end
+
+    subgraph ORCH["Orchestration"]
+        AIR["Apache Airflow
+        DAG: github_lake_dag.py
+        Schemalägger Bronze→Silver→Gold"]
+    end
+
+    GHA -->|".json.gz filer"| BOOT
+    GHE -->|"JSON events"| PROD
+    BOOT -->|"Parquet"| BP
+    PROD -->|"JSON"| KAFKA
+    KAFKA -->|"JSON"| CONS
+    CONS -->|"Parquet"| BP
+    BP --> BTS
+    BTS --> SP
+    SP --> STG
+    STG --> GP1
+    STG --> GP2
+    STG --> GP3
+    GP1 --> GRAF
+    GP2 --> GRAF
+    GP3 --> GRAF
+    AIR -.->|"Triggar"| BTS
+    AIR -.->|"Triggar"| STG

@@ -1,0 +1,53 @@
+flowchart TD
+    subgraph BRONZE["Bronze (Vad vi HAR — rådata)"]
+        BR["Alla event-typer 
+        Ovaliderade värden
+        Duplikater möjliga 
+        Nested JSON-struktur"]
+    end
+
+    subgraph B2S["bronze_to_silver.py (PySpark job)"]
+        direction LR
+        VAL["Validering 
+        Pydantic schema
+        Ogiltiga → DLQ"]
+        DEDUP["Deduplicering
+        Drop på event id"]
+        FLAT["Flattenning Nested JSON → kolumner payload.repo.name payload.commits"]
+        FILT["Filtrering Behåll: Push, PR, Watch Fork, Issue, Create"]
+    end
+
+    subgraph SILVER["Silver (Vad vi VET — ren data)"]
+        SR["event_id, event_type repo_name, actor_login created_at (timestamp), language, stars_count, pr_merged (bool), commit_count (int)"]
+    end
+
+    subgraph S2G["silver_to_gold.py + dbt (Business logic)"]
+        direction LR
+        AGG1["tool_growth, GROUP BY repo_name, week, COUNT stars, forks"]
+        AGG2["activity_heatmap, GROUP BY hour_of_day, day_of_week, COUNT events"]
+        AGG3["pr_cycle_times, JOIN opened + closed PRs, DATEDIFF i timmar"]
+    end
+
+        subgraph GOLD["Gold\n(Vad vi SVARAR — business value)"]
+        G1["tool_growth
+        repo │ week │ new_stars │ new_forks
+        ───────────────────────────
+        dbt-core │ 2025-W10 │ 234 │ 45"]
+        G2["activity_heatmap
+        hour │ weekday │ event_count
+        ───────────────────────────
+        14 │ Tuesday │ 18432"]
+        G3["pr_cycle_times
+        repo │ median_hours │ p95_hours
+        ───────────────────────────
+        airflow │ 18.3 │ 96.1"]
+    end
+
+
+    BRONZE --> B2S
+    VAL --> DEDUP --> FLAT --> FILT
+    B2S --> SILVER
+    SILVER --> S2G
+    AGG1 --> G1
+    AGG2 --> G2
+    AGG3 --> G3

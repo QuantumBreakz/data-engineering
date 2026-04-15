@@ -1,0 +1,47 @@
+flowchart TD
+    subgraph KAFKA["🚦 Kafka Topic: github-events-raw"]
+        OFF["Offset-pekare Kafka minns var consumer senast slutade läsa"]
+        MSG["event_001 event_002 event_003..."]
+    end
+
+    subgraph CONSUMER["🚗 consumer.py"]
+        direction TB
+        POLL["poll()Frågar Kafka: finns det nya meddelanden? Blockerar tills något anländer"]
+        
+        BATCH["Batching-buffer Samlar events i minnet tills batch_size=100 ELLER timeout=60s nås Ingen av dessa = ingen skrivning ännu"]
+        
+        PARSE["Deserialisering json.loads() -> dict Validera att fälten finns"]
+        
+        PART["Partitioneringslogik 
+        Läs created_at från eventet 
+        Bygg sökväg:
+        year=2025/month=03/day=22/"]
+        
+        WRITE["pyarrow.write_to_dataset()
+        Skriver hela batchen som 
+        en Parquet-fil till rätt mapp
+        Atomisk operation"]
+        
+        COMMIT["consumer.commit() Talar om för Kafka: 'Jag har läst till offset X'
+        Om vi kraschar härnäst startar vi om från X+1"]
+    end
+
+    subgraph BRONZE["🥉 Bronze Layer"]
+        P1["data/bronze/events/ 
+        year=2025/month=03/day=22/
+        part-0001.parquet"]
+        P2["data/bronze/events/
+        year=2025/month=03/day=21/
+        part-0001.parquet"]
+    end
+
+    OFF -->|"Vet var vi är i strömmen"| POLL
+    MSG -->|"Nya meddelanden"| POLL
+    POLL --> PARSE
+    PARSE --> BATCH
+    BATCH -->|"Batch full ELLER timeout"| PART
+    PART --> WRITE
+    WRITE --> P1
+    WRITE --> P2
+    WRITE --> COMMIT
+    COMMIT -->|"Uppdaterar offset"| OFF

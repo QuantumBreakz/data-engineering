@@ -1,0 +1,48 @@
+flowchart TD
+    subgraph DOCKER["Docker Network: data-lake-network"]
+        direction TB
+
+        subgraph KAFKA_LAYER["Message Layer"]
+            KAFKA["kafka
+            image: confluentinc/cp-kafka
+            KRaft mode - ingen Zookeeper
+            Ports: 29092 host / 9092 intern
+            ENV: KAFKA_NODE_ID, CLUSTER_ID
+            KRaft listeners config"]
+        end
+
+        subgraph APP_LAYER["Application Layer"]
+
+            PROD["producer
+            image: python:3.12-slim
+            Kör: ingestion/producer.py
+            Pollar GitHub var 5:e min
+            Beroende på: kafka"]
+            CONS["consumer
+            image: python:3.12-slim
+            Kör: ingestion/consumer.py
+            Lyssnar på Kafka topic
+            Skriver Parquet → Bronze
+            Beroende på: kafka"]
+        end
+
+        subgraph STORAGE["Storage - Bind Mounts"]
+            BRONZE["./data/bronze/
+            (på din host-maskin)
+            Monterad i consumer-containern"]
+            ENV[".env fil
+            Monterad i producer + consumer
+            GITHUB_TOKEN, LOG_LEVEL etc"]
+        end
+    end
+
+    KAFKA -->|"topic: github-events-raw
+    port 9092 internt"| CONS
+    PROD -->|"produce() → port 9092 internt"| KAFKA
+    CONS -->|"pyarrow skriver Parquet"| BRONZE
+    ENV -.->|"env_file:"| PROD
+    ENV -.->|"env_file:"| CONS
+
+    GH["🌐 GitHub Events API
+    api.github.com/events"]
+    GH -->|"HTTPS requests\nport 443"| PROD

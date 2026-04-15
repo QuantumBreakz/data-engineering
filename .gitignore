@@ -1,0 +1,118 @@
+# --- Secrets & Credentials (CRITICAL) ---
+.env
+.env.*
+!.env.example
+!.env.template
+# AWS/Cloud keys om de skulle råka hamna här
+.aws/
+secrets/
+
+# --- Dependency Management (uv) ---
+# Jag ignorerar miljön, men INTE uv.lock (den är min "truth")
+.venv/
+venv/
+ENV/
+env/
+
+# --- Python Core & Build Artifacts ---
+__pycache__/
+*.py[cod]
+*$py.class
+# Distribution / Packaging 
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# --- Code Quality & Testing (The Guardrails) ---
+# Ruff cache (gör linter snabbare lokalt, men behövs ej i git)
+.ruff_cache/
+# Mypy cache (type checking history)
+.mypy_cache/
+.dmypy.json
+# Pytest cache
+.pytest_cache/
+# Coverage reports (när jag kör pytest --cov)
+.coverage
+htmlcov/
+coverage.xml
+
+# --- IDE & Editor Junk ---
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+
+# --- Logs & Temp ---
+*.log
+*.tmp
+*.bak
+*.old
+
+# --- Data & Local Storage (SoC: Data lives in DB/Storage, not Git) ---
+# Ignorera faktiska datafiler så jag inte committar kunddata eller stora filer
+*.tsv
+*.parquet
+*.avro
+*.json
+*.xml
+# ...men tillåt specifika config/exempel-filer om jag vill
+!config/*.json
+!examples/*.csv
+!seeds/*.csv
+
+# men tillåt små fixtures/exempel
+!data/fixtures/**/*.json
+!data/fixtures/**/*.xml
+!docs/evidence/**/*.json
+!docs/evidence/**/*.xml
+
+# --- Local Databases ---
+*.sqlite
+*.sqlite3
+*.db
+*.duckdb
+*.wal
+*.journal
+
+# --- Docker & Containers ---
+# Bind mounts för databaser (viktigt att inte committa databasens fysiska filer)
+pgdata/
+postgres_data/
+mysql_data/
+mongo_data/
+docker/.env
+
+
+# --- Data Lake: Lokalt lagrad data (ALDRIG i git) ---
+data/bronze/
+data/silver/
+data/gold/
+data/checkpoints
+
+# --- Apache Spark ---
+spark-warehouse/
+derby.log
+metastore_db/
+*.crc                               # Spark checksum-filer
+
+# --- dbt ---
+dbt/target/
+dbt/logs/
+dbt/.user.yml
+dbt/profiles.yml                    # Innehåller connection strings
+
+# --- Apache Airflow ---
+airflow/logs/
+airflow/plugins/
+airflow.db
+airflow.cfg                         # Kan innehålla känslig info
+
+# --- Kafka / Confluent ---
+kafka-logs/
+
+# --- GitHub Archive bootstrap ---
+*.json.gz                           # Komprimerade GH Archive-filer

@@ -1,0 +1,46 @@
+name: Ci pipe - linting, formatering och unit testing
+
+# 1) TRIGGERS: När ska pipen vakna?
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# 2) JOBS: Vad ska göras av pipen?
+jobs:
+  build-and-test:
+    name: Test Code Quality
+    runs-on: ubuntu-latest # Lånar en Linux server av Github (gratis)
+
+    steps:
+      # Steg A) Hämtar din kod ifrån repot till servern jag lånar
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Steg B) Installera 'uv' (eftersom att jag använder mig av uv istället för pip)
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      # Steg C) Installera rätt python version via uv
+      - name: Set up python
+        run: uv python install 3.12
+
+      # Steg D) Ladda ner alla deps(dependencies, dvs: FastAPI, psycopg, pytest etc etc..)
+      - name: Install dependencies
+        # Installerar (syncar med repots deps) alla dependencies som finns i repots pyproject.toml fil
+        run: uv sync
+
+      # Steg E) Kör ruff för att kolla kodstil(linting)
+      - name: Lint with Ruff
+        run: uv run ruff check .
+
+      # Steg F) Kör Ruff för att kolla formatering
+      - name: Format check using Ruff
+        run: uv run ruff format --check .
+
+        # Steg G) Kör testerna på vår kod vi pushar. Om detta MISSLYCKAS -> Pull requesten STOPPAS.
+    #  - name: Run Unit tests
+    #    run: uv run pytest tests/
